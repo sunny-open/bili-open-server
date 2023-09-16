@@ -1,0 +1,18 @@
+{
+  "root": true,
+  "extends": ["@vampire-rip"],
+  "overrides": [
+    {
+      "files": ["**/*.tsx", "**/*.ts"],
+      "rules": {
+        // https://www.npmjs.com/package/eslint-import-resolver-typescript
+        "import/no-unresolved": "off",
+        "@typescript-eslint/naming-convention": "off",
+        "@typescript-eslint/semi": "off",
+        "@typescript-eslint/no-namespace": "off",
+        "new-cap": "off"
+      }
+    }
+  ],
+  "ignorePatterns": ["**/*.min.js", "**/assets/**.js"]
+}
