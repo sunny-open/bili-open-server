@@ -2,6 +2,7 @@ import Router from '@koa/router';
 import { BusinessError, api } from '../tools/request.js';
 import { authH5Params } from '../tools/auth.js';
 import { wrapResponseData } from '../tools/response.js';
+import { Synthesizer } from '../extension-tts/index.js';
 
 const router = new Router();
 
@@ -38,6 +39,37 @@ router.post('/auth', async (ctx) => {
   const { code } = authResult;
   const data = await api.GameStart({ app_id: APP_ID, code });
   ctx.body = wrapResponseData(data);
+});
+
+// tts
+let ttsInstance: Synthesizer;
+router.post('/tts', async (ctx) => {
+  const params = ctx.query;
+  const authResult = authH5Params(params);
+  if (authResult === null) {
+    throw new BusinessError(2101, 'Auth Failed');
+  }
+
+  const { voice, text, token } = ctx.request.body;
+  if (token !== 'example token') {
+    throw new BusinessError(2104, 'Provide Token');
+  }
+
+  if (!ttsInstance) {
+    ttsInstance = new Synthesizer({ voice });
+  }
+
+  try {
+    const result = await ttsInstance.speakText(text as string);
+    ctx.set('Content-Type', 'audio/wav');
+    ctx.body = result.asStream();
+  } catch (e: unknown) {
+    throw new BusinessError(
+      2104,
+      'Extension Error',
+      e instanceof Error ? e.message : Object.prototype.toString.call(e),
+    );
+  }
 });
 
 export default router;
