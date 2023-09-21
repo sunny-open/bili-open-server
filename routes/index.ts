@@ -3,6 +3,7 @@ import { BusinessError, api } from '../tools/request.js';
 import { authH5Params } from '../tools/auth.js';
 import { wrapResponseData } from '../tools/response.js';
 import { Synthesizer } from '../extension-tts/index.js';
+import { checkTTSLimit } from '../extension-tts/limit.js';
 
 const router = new Router();
 
@@ -42,7 +43,6 @@ router.post('/auth', async (ctx) => {
 });
 
 // tts
-let ttsInstance: Synthesizer;
 router.post('/tts', async (ctx) => {
   const params = ctx.query;
   const authResult = authH5Params(params);
@@ -51,13 +51,14 @@ router.post('/tts', async (ctx) => {
   }
 
   const { voice, text, token } = ctx.request.body;
+  console.log(`[${authResult.user_id} request tts |${text.length}|]`);
   if (token !== 'example token') {
     throw new BusinessError(2104, 'Provide Token');
   }
 
-  if (!ttsInstance) {
-    ttsInstance = new Synthesizer({ voice });
-  }
+  await checkTTSLimit({ code: authResult.code, uid: authResult.user_id, text });
+
+  const ttsInstance = new Synthesizer({ voice });
 
   try {
     const result = await ttsInstance.speakText(text as string);
@@ -69,6 +70,8 @@ router.post('/tts', async (ctx) => {
       'Extension Error',
       e instanceof Error ? e.message : Object.prototype.toString.call(e),
     );
+  } finally {
+    ttsInstance.done();
   }
 });
 

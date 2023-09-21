@@ -114,7 +114,7 @@ export class Synthesizer {
 
     const speechConfig = sdk.SpeechConfig.fromSubscription(speech_key, speech_region);
     const audioConfig = file ? sdk.AudioConfig.fromAudioFileOutput(file) : undefined;
-    speechConfig.speechSynthesisVoiceName = voice ? voice : 'zh-CN-XiaoxiaoNeural';
+    speechConfig.speechSynthesisVoiceName = voice ? voice : 'zh-CN-XiaoshuangNeural';
 
     this.#synthesizer = new sdk.SpeechSynthesizer(speechConfig, audioConfig);
   }
