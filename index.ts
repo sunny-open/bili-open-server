@@ -5,6 +5,8 @@ import { bodyParser } from '@koa/bodyparser';
 
 import router from './routes/index.js';
 import { wrapResponseError } from './tools/response.js';
+import { PredefinedError } from './types/error.js';
+import { logger } from './tools/logger.js';
 
 const app = new Koa();
 
@@ -15,7 +17,12 @@ app.use(async (ctx, next) => {
     await next();
   } catch (e: unknown) {
     const response = wrapResponseError(e);
-    console.error(`request response with error`, response);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+    if (response.code !== PredefinedError.E_AUTH_FAILED && response.code !== 7003) {
+      // 7003 是心跳过期，可能开了另外一个实例
+      logger(ctx, `E-RES`, response);
+    }
+
     ctx.body = response;
   }
 

@@ -1,9 +1,11 @@
+import { type ParameterizedContext } from 'koa';
 import { client } from '../extension-redis/index.js';
 import { BusinessError } from '../tools/request.js';
+import { PredefinedError } from '../types/error.js';
+import { type State } from '../types/index.js';
+import { getEntryKey, logger } from '../tools/logger.js';
 
 type Params = {
-  uid?: number;
-  code: string;
   text: string;
 };
 
@@ -14,16 +16,16 @@ const getExpireAt = () => {
   return Math.floor(todayEnd / 1000);
 };
 
-export async function checkTTSLimit(params: Params) {
-  const { text, code, uid } = params;
+export async function checkTTSLimit(ctx: ParameterizedContext<State>, params: Params) {
+  const { text } = params;
   const todo = text.length + 2;
-  const key = uid ? `uid-${uid}` : `insecure-${code}`;
+  const key = getEntryKey(ctx);
   const expireAt = getExpireAt();
 
   try {
     const result = await client.incrbyex(key, todo, expireAt);
 
-    console.log(`[TTS-LIMIT] ${key}-${todo}-${result}`);
+    logger(ctx, `I-TTS-LIMIT`, `${todo}-${result}`);
 
     if (result) {
       const current = Number.parseInt(result, 10);
@@ -32,8 +34,8 @@ export async function checkTTSLimit(params: Params) {
       }
     }
   } catch (e) {
-    throw new BusinessError(4290, `limit query failed`);
+    throw new BusinessError(PredefinedError.E_LIMIT_EXCEED, `limit query failed`);
   }
 
-  throw new BusinessError(4290, `limit exceed`);
+  throw new BusinessError(PredefinedError.E_LIMIT_EXCEED, `limit exceed`);
 }

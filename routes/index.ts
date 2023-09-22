@@ -1,11 +1,14 @@
 import Router from '@koa/router';
 import { BusinessError, api } from '../tools/request.js';
-import { authH5Params } from '../tools/auth.js';
 import { wrapResponseData } from '../tools/response.js';
 import { Synthesizer } from '../extension-tts/index.js';
 import { checkTTSLimit } from '../extension-tts/limit.js';
+import { authMiddleware } from '../middlewares/auth.js';
+import { type State } from '../types/index.js';
+import { PredefinedError } from '../types/error.js';
+import { logger } from '../tools/logger.js';
 
-const router = new Router();
+const router = new Router<State>();
 
 const APP_ID = Number(process.env.BILI_APP_ID);
 
@@ -16,47 +19,34 @@ const APP_ID = Number(process.env.BILI_APP_ID);
 // })
 
 // 关闭路由
-router.post('/stop', async (ctx) => {
+router.post('/stop', authMiddleware, async (ctx) => {
   const { game_id } = ctx.request.body;
   const data = await api.GameEnd({ app_id: APP_ID, game_id });
   ctx.body = wrapResponseData(data);
 });
 
 // 保活心跳路由
-router.post('/keepalive', async (ctx) => {
+router.post('/keepalive', authMiddleware, async (ctx) => {
   const { game_id } = ctx.request.body;
   const data = await api.GameHeartbeat({ game_id });
   ctx.body = wrapResponseData(data);
 });
 
 // H5 应用验证
-router.post('/auth', async (ctx) => {
-  const params = ctx.query;
-  const authResult = authH5Params(params);
-  if (authResult === null) {
-    throw new BusinessError(2101, 'Auth Failed');
-  }
-
-  const { code } = authResult;
+router.post('/auth', authMiddleware, async (ctx) => {
+  const { code } = ctx.state.auth;
   const data = await api.GameStart({ app_id: APP_ID, code });
   ctx.body = wrapResponseData(data);
 });
 
 // tts
-router.post('/tts', async (ctx) => {
-  const params = ctx.query;
-  const authResult = authH5Params(params);
-  if (authResult === null) {
-    throw new BusinessError(2101, 'Auth Failed');
-  }
+router.post('/tts', authMiddleware, async (ctx) => {
+  const { code, user_id } = ctx.state.auth;
 
-  const { voice, text, token } = ctx.request.body;
-  console.log(`[${authResult.user_id} request tts |${text.length}|]`);
-  if (token !== 'example token') {
-    throw new BusinessError(2104, 'Provide Token');
-  }
+  const { voice, text } = ctx.request.body;
+  logger(ctx, 'I-REQ', `request tts |${text.length}|`);
 
-  await checkTTSLimit({ code: authResult.code, uid: authResult.user_id, text });
+  await checkTTSLimit(ctx, { text });
 
   const ttsInstance = new Synthesizer({ voice });
 
@@ -66,8 +56,8 @@ router.post('/tts', async (ctx) => {
     ctx.body = result.asStream();
   } catch (e: unknown) {
     throw new BusinessError(
-      2104,
-      'Extension Error',
+      PredefinedError.E_EXTENSION_ERROR,
+      'extension error',
       e instanceof Error ? e.message : Object.prototype.toString.call(e),
     );
   } finally {
